@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<HTML>
+  <HEAD>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Content-Script-Type" content="text/javascript" />
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+
+    <TITLE>ことのはレンズ</TITLE>
+    <!-- <META http-equiv="Refresh" content="0;URL=kotonoha.html"> -->
+
+
+  </HEAD>
+  <BODY>
+    <span id="id" name="id"> hoge </span>
+    <span id="text"> bar </span>
+    <P></P>
+  </BODY>
+
+  <script language="javascript" type="text/javascript">
+    // URLを取得
+    let url = new URL(window.location.href);
+    // URLSearchParamsオブジェクトを取得
+    let params = url.searchParams;
+    let home   = params.get( 'home' );
+    //home="xxx" で分岐
+    if ( home == null ) {
+      window.location = "kotonoha.html";
+    }
+    else {
+      document.getElementById( "id" ).innerHTML = home;
+      document.getElementById( "text" ).innerHTML = "BUZ";
+    }
+  </script>
+</HTML>
