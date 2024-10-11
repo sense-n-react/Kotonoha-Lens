@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<!--
+    http://www.enjoyxstudy.com/javascript/incsearch/
+  -->
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Content-Script-Type" content="text/javascript" />
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport"
+          content="width=320,
+                   height=480,
+                   initial-scale=1.0,
+                   minimum-scale=1.0,
+                   maximum-scale=2.0,
+                   user-scalable=yes" />
+
+    <title>ことのはレンズ</title>
+    <style type="text/css">
+      <!--
+
+      body {
+          background-color: #e8e8ff;
+          margin: 2px;
+      }
+      .box {
+          border: 2px solid #808080;
+          /* background-color: #e0e0d0;*/
+          width:  400px;
+          height: 120px;
+          overflow-y: scroll;
+          font-size: 90%;
+      }
+      .subbox {
+          width:  400px;
+          height: 120px;
+          overflow-y: scroll;
+      }
+      .hit {
+          background-color: #a7d28d;
+          font-weight : bold ;
+      }
+      .blow {
+          background-color: #fcc949;
+          font-weight : bold ;
+      }
+      .none {
+          background-color: #808080;
+          color: #ffffff;
+          font-weight : bold ;
+      }
+      .R {
+          color: red;
+      }
+      .B {
+          color: red;
+          font-weight: bold;
+      }
+      .O {
+          color: orange;
+      }
+      -->
+    </style>
+  </head>
+
+  <body>
+    <h3>　　　ことのはレンズ
+    <font size=-3>(2024/09/20 22:46:01)</font></h3>
+    <font size=-1>当たり！</font>
+    <input type="text" size="3" id="hit_1" class="hit" >
+    <input type="text" size="3" id="hit_2" class="hit" >
+    <input type="text" size="3" id="hit_3" class="hit" >
+    <input type="text" size="3" id="hit_4" class="hit" >
+    <input type="text" size="3" id="hit_5" class="hit" >
+    <br>
+
+    <font size=-1>おしい！</font>
+    <input type="text" size="3" id="blow_1" class="blow" >
+    <input type="text" size="3" id="blow_2" class="blow" >
+    <input type="text" size="3" id="blow_3" class="blow" >
+    <input type="text" size="3" id="blow_4" class="blow" >
+    <input type="text" size="3" id="blow_5" class="blow" >
+    <br>
+
+    <font size=-1>はずれ　</font>
+    <input type="text" size="36" id="none" class="none" >
+    <br>
+    <br>
+
+    <div id="grep_condition"></div>
+    <div class="box">
+      <pre><div id="candidate_words"></div></pre>
+    </div>
+    <br>
+    候補の単語で使われている文字（頻度順）<br>
+    <div class="box">
+      <pre><div id="hist_chars"></div></pre>
+    </div>
+    <br>
+    候補を絞り込む単語：<span id="refine_num"></span> 件
+    <input type="button" value="Shrink" onclick="OnShrinkClick();" id="Shrink"/>    <br>
+    <div class="box">
+      <pre><div id="refine_words"></div></pre>
+    </div>
+
+    <br>
+    <div hidden>
+      スクロール<br>
+      <div class="box">
+        <pre><div id="scroll-container" class="subbox" ></div><pre>
+      </div>
+    </div>
+    <script type="text/javascript">
+      const container = document.getElementById('scroll-container');
+      console.log( "FOO" );
+      let totalRows = 1000; // 例えば10,000行のテキストがあるとします
+      let rowHeight = 10; // 各行の高さ
+
+      // スクロールイベントハンドラ
+      function onScroll() {
+          let scrollTop = container.scrollTop;
+          let firstRow = Math.floor(scrollTop / rowHeight);
+          let visibleRowCount = Math.ceil(container.clientHeight / rowHeight);
+      updateDisplay(firstRow, visibleRowCount);
+      console.log( "Height:", container.clientHeight, "scrollTop:", scrollTop, "firstRow:", firstRow, "Count:", visibleRowCount );
+      }
+
+      // 表示を更新する関数
+      function updateDisplay(firstRow, visibleRowCount) {
+          let displayRows = ''; // 表示する行のテキスト
+          let endRow = firstRow + visibleRowCount;
+
+          // 必要な行のみを生成
+          for (let i = firstRow; i < endRow && i < totalRows; i++) {
+              displayRows += 'Row ' + i + '<br>';
+          }
+
+          // コンテナにテキストを設定
+          container.innerHTML = displayRows;
+      }
+
+      // スクロールイベントリスナーを追加
+      container.addEventListener('scroll', onScroll);
+      // 初期表示
+      updateDisplay(0, Math.ceil(container.clientHeight / rowHeight));
+    </script>
+
+    <!-- db_text の読み込み -->
+    <script type="text/javascript" src="./kotonoha.txt"></script>
+
+    <script type="text/javascript" src="./kotonoha.js"></script>
+  </body>
+
+</html>
