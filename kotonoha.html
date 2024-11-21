@@ -94,58 +94,17 @@
       <pre><div id="candidate_words"></div></pre>
     </div>
     <br>
-    候補の単語で使われている文字（頻度順）<br>
-    <div class="box">
-      <pre><div id="hist_chars"></div></pre>
-    </div>
-    <br>
     候補を絞り込む単語：<span id="refine_num"></span> 件
     <input type="button" value="Shrink" onclick="OnShrinkClick();" id="Shrink"/>    <br>
     <div class="box">
       <pre><div id="refine_words"></div></pre>
     </div>
-
     <br>
-    <div hidden>
-      スクロール<br>
-      <div class="box">
-        <pre><div id="scroll-container" class="subbox" ></div><pre>
-      </div>
+    候補の単語で使われている文字（頻度順）<br>
+    <div class="box">
+      <pre><div id="hist_chars"></div></pre>
     </div>
-    <script type="text/javascript">
-      const container = document.getElementById('scroll-container');
-      console.log( "FOO" );
-      let totalRows = 1000; // 例えば10,000行のテキストがあるとします
-      let rowHeight = 10; // 各行の高さ
-
-      // スクロールイベントハンドラ
-      function onScroll() {
-          let scrollTop = container.scrollTop;
-          let firstRow = Math.floor(scrollTop / rowHeight);
-          let visibleRowCount = Math.ceil(container.clientHeight / rowHeight);
-      updateDisplay(firstRow, visibleRowCount);
-      console.log( "Height:", container.clientHeight, "scrollTop:", scrollTop, "firstRow:", firstRow, "Count:", visibleRowCount );
-      }
-
-      // 表示を更新する関数
-      function updateDisplay(firstRow, visibleRowCount) {
-          let displayRows = ''; // 表示する行のテキスト
-          let endRow = firstRow + visibleRowCount;
-
-          // 必要な行のみを生成
-          for (let i = firstRow; i < endRow && i < totalRows; i++) {
-              displayRows += 'Row ' + i + '<br>';
-          }
-
-          // コンテナにテキストを設定
-          container.innerHTML = displayRows;
-      }
-
-      // スクロールイベントリスナーを追加
-      container.addEventListener('scroll', onScroll);
-      // 初期表示
-      updateDisplay(0, Math.ceil(container.clientHeight / rowHeight));
-    </script>
+    <br>
 
     <!-- db_text の読み込み -->
     <script type="text/javascript" src="./kotonoha.txt"></script>
