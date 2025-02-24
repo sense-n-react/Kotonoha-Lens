@@ -108,7 +108,16 @@
 
     <!-- db_text の読み込み -->
     <script type="text/javascript" src="./kotonoha.txt"></script>
-
+    <script type="text/javascript" src="./csv_data.txt"></script>
+    <script>
+      const db_ = new URLSearchParams(window.location.search).get("db");
+      console.log( db_ );
+      var db_text;
+      db_text = db_text_1
+      if ( db_ != null ) {
+          db_text = db_text_2
+      }
+    </script>
     <script type="text/javascript" src="./kotonoha.js"></script>
   </body>
 
