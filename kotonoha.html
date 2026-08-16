@@ -61,6 +61,16 @@
           width: 404px;
           margin-bottom: 4px;
       }
+      .title-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          width: 404px;
+      }
+      .small-button {
+          font-size: 60%;
+          padding: 1px 4px;
+      }
       .row-label {
           flex: 0 0 auto;
           width: 4.5em;
@@ -97,8 +107,11 @@
   </head>
 
   <body>
+    <div class="title-row">
     <h3>　　　ことのはレンズ
     <font size=-3>(2026/08/16 10:28:28)</font></h3>
+    <input type="button" value="入力クリア" onclick="OnClearClick();" id="ClearInputs" class="small-button"/>
+    </div>
     <div class="row">
     <font size=-1 class="row-label">当たり！</font>
     <div class="row-items">

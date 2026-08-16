@@ -32,7 +32,15 @@ function hiraToKata(str) {
   );
 }
 
-function uniq( a )       { return Array.from( new Set( a ) ).sort();  }
+// 重複除去した上で並べ替えた Array を返す
+function uniqSorted( a ) { return Array.from( new Set( a ) ).sort();  }
+
+// innerHTML に生の単語を差し込む前にエスケープする
+function escapeHTML( str ) {
+  return str.replace( /[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]) );
+}
 
 // 連想配列をソートして Array を返す
 function dic_sort( dic ) {
@@ -62,6 +70,18 @@ const sleep = (msec) => {
   });
 };
 
+//
+// 定数
+//
+const CHUNK_YIELD_MS       = 1;   // チャンク処理の合間にイベントループへ制御を戻す待ち時間
+const GREP_YIELD_STEP_DIV  = 10;  // grep() のループを何分割してsleepを挟むか
+const CANDIDATE_CHUNK_DIV  = 10;  // candidate_words のチャンクサイズ = lines.length / この値
+const CANDIDATE_CHUNK_MIN  = 20;  // candidate_words の最小チャンクサイズ
+const REFINE_CHUNK_DIV     = 20;  // refine_words のチャンクサイズ = dict.words.length / この値
+const HIST_CHARS_COLUMNS   = 6;   // 文字ヒストグラムの1行あたりの表示数
+const REFINE_WORDS_COLUMNS = 3;   // 絞り込み候補の1行あたりの表示数
+const INPUTS_STORAGE_KEY   = 'kotonoha_lens_inputs'; // 入力欄の内容を保存する localStorage のキー
+
 const cur_chars = {
   hit_1  : "", hit_2  : "", hit_3  : "", hit_4  : "",  hit_5  : "",
   blow_1 : "", blow_2 : "", blow_3 : "", blow_4 : "",  blow_5 : "",
@@ -84,33 +104,37 @@ const NON_KANA_REGE = new RegExp( "[^" +
                                   KANA_LIST.join('') +
                                   hiraToKata( KANA_LIST.join('') ) +
                                   "]" );
-var DB = [];
-var HIRA_DB  = [];
-var HIRA_DBa = [];
-var HIRA_DBa2= [];
+// 単語辞書
+const dict = {
+  words:       [], // 単語（表記そのまま）
+  hira:        [], // 単語をひらがな化したもの
+  chars:       [], // 単語に含まれる文字（重複除去 + ソート済み）
+  charsShrunk: [], // 異なり文字集合が同じ単語をまとめた版（'いんしょう'と'しょういん'を区別しない）
+};
 
-var in_analyze = false;
+var in_analyze     = false;
+var input_pending  = false; // in_analyze 中に入力の変化があったかどうか
 
 function start() {
   log( '' )
   log( "> start");
   //
-  // kotonoha.txt を内容から DB[] を作る
+  // kotonoha.txt を内容から dict.words[] を作る
   //
-  shrinked_DB = new Set();
+  let shrinked_DB = new Set();
 
   const push = (wd) => {
     let hira = kataToHira( wd );
-    DB.push( wd );
-    HIRA_DB.push( hira );
-    let ua = uniq( hira.split( '' ) );   // ['た','ま','て','ば','こ']
-    HIRA_DBa.push( ua );                 // ['たまてばこ']
+    dict.words.push( wd );
+    dict.hira.push( hira );
+    let ua = uniqSorted( hira.split( '' ) );   // ['た','ま','て','ば','こ']
+    dict.chars.push( ua );                     // ['たまてばこ']
     if ( shrinked_DB.has( ua.join('') ) ) {
-      HIRA_DBa2.push( [] );
+      dict.charsShrunk.push( [] );
     }
     else {
       // 'いんしょう' と 'しょういん' を区別しない
-      HIRA_DBa2.push( ua );
+      dict.charsShrunk.push( ua );
       shrinked_DB.add( ua.join('') );
     }
   };
@@ -141,15 +165,63 @@ function start() {
     btn.addEventListener( "input", check_input );
   });
 
+  loadInputs();
+
   log( "< start");
   check_input();
 };
 
+//
+// 入力欄の内容の永続化（ページの再読み込みでクリアされないように）
+//
+function saveInputs() {
+  let data = {};
+  Object.keys(cur_chars).forEach( id => {
+    data[id] = document.getElementById( id ).value;
+  });
+  try {
+    localStorage.setItem( INPUTS_STORAGE_KEY, JSON.stringify( data ) );
+  } catch (e) {
+    console.log( "saveInputs() failed: " + e );
+  }
+}
+
+function loadInputs() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem( INPUTS_STORAGE_KEY );
+  } catch (e) {
+    console.log( "loadInputs() failed: " + e );
+  }
+  if ( !raw ) return;
+
+  try {
+    let data = JSON.parse( raw );
+    Object.keys(cur_chars).forEach( id => {
+      if ( typeof data[id] == 'string' ) {
+        document.getElementById( id ).value = data[id];
+      }
+    });
+  } catch (e) {
+    console.log( "loadInputs() failed to parse: " + e );
+  }
+}
+
+function OnClearClick() {
+  log( "click() OnClearClick" );
+  Object.keys(cur_chars).forEach( id => {
+    document.getElementById( id ).value = '';
+  });
+  check_input();
+};
 
 function check_input() {
+  saveInputs();
+
   if ( in_analyze ) {
-    console.log( "IN ANALYZE" );
-    setTimeout( check_input, 300 ); // 少し待って再トライ
+    // analyze() が終わったタイミングで自分自身が再度呼ばれるようにする
+    input_pending = true;
+    log( "check_input() delayed: in_analyze" );
     return;
   }
 
@@ -183,28 +255,44 @@ function OnShrinkClick() {
 };
 //
 //
-var candidate_chars = {};
-var must_RE         = null;
-var must_KANA_dic   = {};
+// 直近の検索結果に関する状態
+let searchState = {
+  candidateChars: {},   // 現在の候補単語に含まれる文字とその出現回数
+  mustRE:         null, // 「当たり」「おしい」文字にマッチする正規表現
+  mustKanaDic:    {},   // 「当たり」「おしい」文字の有無を引けるハッシュ
+};
+
+//
+// チャンクに分割しながら、時々 event loop に制御を渡しつつ
+// html を組み立てて id の要素に反映する（重い整形処理の共通化）
+//
+async function renderChunked( id, items, chunkSize, formatChunk ) {
+  let doc = '';
+  for ( let i = 0; i < items.length; i += chunkSize ) {
+    doc += formatChunk( items.slice( i, i + chunkSize ) ) + "<br>";
+    await sleep( CHUNK_YIELD_MS );
+  }
+  update_doc( id, doc );
+}
 
 async function grep( pattern, blow_chars, ng_chars ) {
   log( "> grep( "+ pattern + ")" );
 
   let candidate_words = [];
-  candidate_chars = {};
+  searchState.candidateChars = {};
 
   let match_re = new RegExp( kataToHira( pattern ) )
   let ng_re    = new RegExp( "[" + kataToHira( ng_chars ) + "]" );
 
   let blow_a   = blow_chars.split('')
   let lines    = [];
-  let step     = Math.floor( DB.length / 10 );
+  let step     = Math.max( 1, Math.floor( dict.words.length / GREP_YIELD_STEP_DIV ) );
 
-  for ( let i = 0; i < DB.length; ++i ) {
+  for ( let i = 0; i < dict.words.length; ++i ) {
     // 8000回ループの間、時々 event loopに制御を渡す
-    if ( i % step == 0 ) { await sleep(1); }
+    if ( i % step == 0 ) { await sleep( CHUNK_YIELD_MS ); }
 
-    let wd = HIRA_DB[i];
+    let wd = dict.hira[i];
 
     if (
       // おしい文字全てが含まれている
@@ -215,17 +303,17 @@ async function grep( pattern, blow_chars, ng_chars ) {
       ( wd.search( match_re ) >= 0 ) ) {
 
       // 候補単語に追加
-      candidate_words.push( DB[i] );
+      candidate_words.push( dict.words[i] );
       // 文字の使用頻度
-      HIRA_DBa[i].forEach( c => {
-        candidate_chars[c] = ( candidate_chars[c] || 0 ) + 1;
+      dict.chars[i].forEach( c => {
+        searchState.candidateChars[c] = ( searchState.candidateChars[c] || 0 ) + 1;
       });
       // ５単語 単位で改行
       if ( ( candidate_words.length - 1 ) % 5 == 0 ) {      // 行頭
-        lines.push( DB[i] );
+        lines.push( escapeHTML( dict.words[i] ) );
       }
       else {
-        lines[ lines.length - 1 ] += "　" + DB[i];  // 空白に続けて追加
+        lines[ lines.length - 1 ] += "　" + escapeHTML( dict.words[i] );  // 空白に続けて追加
       }
     }
   }
@@ -243,14 +331,10 @@ async function grep( pattern, blow_chars, ng_chars ) {
 
   // 候補単語に色を付ける処理が重たいので
   // 分割処理して、時々 event loop に制御を渡す
-  let candidate_doc = '';
-  let sub_len       = Math.max( 20, lines.length / 10 );
-  for ( let i = 0; i < lines.length; i += sub_len ) {
-    candidate_doc += lines.slice( i, i + sub_len ).join( "<br>" ).
-      replace( must_RE, '<span class="B">$&</span>' ) + "<br>"
-    await sleep(1);
-  }
-  update_doc( 'candidate_words', candidate_doc );
+  let sub_len = Math.max( CANDIDATE_CHUNK_MIN, Math.floor( lines.length / CANDIDATE_CHUNK_DIV ) );
+  await renderChunked( 'candidate_words', lines, sub_len, chunk =>
+    chunk.join( "<br>" ).replace( searchState.mustRE, '<span class="B">$&</span>' )
+  );
 
   log( "< grep()" );
 }
@@ -261,17 +345,16 @@ async function grep( pattern, blow_chars, ng_chars ) {
 async function show_used_chars() {
   log( "> show_used_chars()" );
 
-  //  candidate_chars : { k1:v1, k2:v2, ,,, ]    c と その出現回数
+  //  searchState.candidateChars : { k1:v1, k2:v2, ,,, ]    c と その出現回数
   //  dic_sort : [{km:vm}, {kn:vn} ....]     <= {k:v} の配列にして v でsort
   //
-  let chars = dic_sort( candidate_chars );
+  let chars = dic_sort( searchState.candidateChars );
   let text = ""
-  let col  = 6;
-  for ( let i = 0; i < chars.length; i += col ) {
-    text += chars.slice( i, i + col ).
+  for ( let i = 0; i < chars.length; i += HIST_CHARS_COLUMNS ) {
+    text += chars.slice( i, i + HIST_CHARS_COLUMNS ).
       map( (h) => ( '    ' + h.value ).slice( -4 ) + ':' + h.key ).
       join( '　' ).
-      replace( must_RE, '<span class="B">$&</span>' ) + "<br>";
+      replace( searchState.mustRE, '<span class="B">$&</span>' ) + "<br>";
   }
 
   // must_chars を赤で表示
@@ -290,20 +373,20 @@ async function show_used_chars() {
 async function refine() {
   log( "> refine()" );
 
-  log( "> DB.forEach" );
-  // DB[] の単語に rate で重みを付ける
+  log( "> dict.words.forEach" );
+  // dict.words[] の単語に rate で重みを付ける
   let score = {}
 
-  let hira_db = ( shrinked )? HIRA_DBa2 : HIRA_DBa;
-  for ( let i = 0; i < DB.length; i++ ) {
+  let hira_db = ( shrinked )? dict.charsShrunk : dict.chars;
+  for ( let i = 0; i < dict.words.length; i++ ) {
     let s   = 0;
     hira_db[i].forEach( ( c ) => {
-      s += ( must_KANA_dic[ c ] == 0 )? ( candidate_chars[c] || 0 ) : 0;
+      s += ( searchState.mustKanaDic[ c ] == 0 )? ( searchState.candidateChars[c] || 0 ) : 0;
     });
-    if ( s > 0 ) score[ DB[i] ] = s;
+    if ( s > 0 ) score[ dict.words[i] ] = s;
   }
 
-  log( "< DB.forEach" );
+  log( "< dict.words.forEach" );
   // => { けものみち:9, わさびもち:10, ちょっけつ: 8,,, }
 
   // 重みでソート、重みゼロをフィルタリング
@@ -311,9 +394,9 @@ async function refine() {
   let score_hist = dic_sort( score );
   let lines = [];
   log( "> make lines" );
-  for ( let i = 0; i < score_hist.length; i += 3 ) {
-    lines.push( score_hist.slice( i, i + 3 ).
-                map( sc => ('    ' + sc.value ).slice( -5 ) + ':' + sc.key ).
+  for ( let i = 0; i < score_hist.length; i += REFINE_WORDS_COLUMNS ) {
+    lines.push( score_hist.slice( i, i + REFINE_WORDS_COLUMNS ).
+                map( sc => ('    ' + sc.value ).slice( -5 ) + ':' + escapeHTML( sc.key ) ).
                 join( '　' )
               );
   }
@@ -326,23 +409,18 @@ async function refine() {
   // するための RegExp => rege2
   // 候補単語の文字を削除
   let unused_chars = KANA_LIST.join('').replace(
-    new RegExp( '[' + Object.keys( candidate_chars ) + ']', 'g' ),
+    new RegExp( '[' + Object.keys( searchState.candidateChars ).join('') + ']', 'g' ),
     '' );
   let unused_re = new RegExp( '[' + unused_chars + hiraToKata(unused_chars) + ']+', 'g' );
 
   // 候補単語に色を付ける処理が重たいので、分割処理して時々 event loop に制御を渡す
-  let refine_doc = "";
-  let sub_len = Math.floor( DB.length / 20 );
-  for ( let i = 0; i < lines.length; i += sub_len ) {
-    log( "make refine_doc: " + ( "    " + i ).slice(-4) + "/" + lines.length );
-    refine_doc += lines.slice( i, i + sub_len ).join( "<br>" ).
-      replace( must_RE,   '<span class="R">$&</span>' ).
-      replace( unused_re, '<span class="O">$&</span>' ) +
-      "<br>"
-    await sleep(1);
-  }
+  let sub_len = Math.max( 1, Math.floor( dict.words.length / REFINE_CHUNK_DIV ) );
+  await renderChunked( 'refine_words', lines, sub_len, chunk =>
+    chunk.join( "<br>" ).
+      replace( searchState.mustRE, '<span class="R">$&</span>' ).
+      replace( unused_re,          '<span class="O">$&</span>' )
+  );
   update_doc( 'refine_num', '' + score_hist.length );
-  update_doc( 'refine_words', refine_doc );
   log( "< refine()" );
 }
 
@@ -365,18 +443,18 @@ async function analyze() {
   let ng_chars = cur_chars[ "none" ];
 
   // 必ず含まれる文字の RegEx
-  let must_chars = uniq( ( hit_c + blow_c ).split('') ).join('');
+  let must_chars = uniqSorted( ( hit_c + blow_c ).split('') ).join('');
   KANA_LIST.forEach( c => {
-    must_KANA_dic[ c ]  = must_chars.indexOf( c ) >= 0 ? 1: 0;
+    searchState.mustKanaDic[ c ]  = must_chars.indexOf( c ) >= 0 ? 1: 0;
   });
-  must_RE = new RegExp( '[' + must_chars + hiraToKata(must_chars) + ']', 'g' );
+  searchState.mustRE = new RegExp( '[' + must_chars + hiraToKata(must_chars) + ']', 'g' );
 
   // blow_chars を含み、cur_chars[ "none" ]を含まず
   // pattern にマッチする 単語 を調べる
-  // その単語に含まれる文字 => candidate_chars
+  // その単語に含まれる文字 => searchState.candidateChars
   await grep( pattern, blow_c, ng_chars );
 
-  // 検索結果の単語に含まれる文字(candidate_chars)を頻度順に表示
+  // 検索結果の単語に含まれる文字(searchState.candidateChars)を頻度順に表示
   await show_used_chars();
 
   // 絞り込みのための候補単語を表示
@@ -384,6 +462,12 @@ async function analyze() {
 
   log( "< analyze()" );
   in_analyze = false;
+
+  // analyze() 実行中に入力が変化していたら、続けてチェックする
+  if ( input_pending ) {
+    input_pending = false;
+    check_input();
+  }
 }
 
 start();
