@@ -33,6 +33,9 @@
           overflow-y: scroll;
           font-size: 90%;
       }
+      .box pre {
+          margin: 0;
+      }
       .subbox {
           width:  400px;
           height: 120px;
@@ -41,15 +44,43 @@
       .hit {
           background-color: #a7d28d;
           font-weight : bold ;
+          box-sizing: border-box;
+          flex: 1 1 0;
+          min-width: 0;
       }
       .blow {
           background-color: #fcc949;
           font-weight : bold ;
+          box-sizing: border-box;
+          flex: 1 1 0;
+          min-width: 0;
+      }
+      .row {
+          display: flex;
+          align-items: center;
+          width: 404px;
+          margin-bottom: 4px;
+      }
+      .row-label {
+          flex: 0 0 auto;
+          width: 4.5em;
+          box-sizing: border-box;
+          white-space: nowrap;
+      }
+      .row-items {
+          flex: 1 1 auto;
+          display: flex;
+          justify-content: flex-start;
+          gap: 2px;
+          min-width: 0;
       }
       .none {
           background-color: #808080;
           color: #ffffff;
           font-weight : bold ;
+          box-sizing: border-box;
+          flex: 1 1 auto;
+          min-width: 0;
       }
       .R {
           color: red;
@@ -67,26 +98,35 @@
 
   <body>
     <h3>　　　ことのはレンズ
-    <font size=-3>(2026/06/29 07:50:35)</font></h3>
-    <font size=-1>当たり！</font>
+    <font size=-3>(2026/08/16 10:28:28)</font></h3>
+    <div class="row">
+    <font size=-1 class="row-label">当たり！</font>
+    <div class="row-items">
     <input type="text" size="3" id="hit_1" class="hit" >
     <input type="text" size="3" id="hit_2" class="hit" >
     <input type="text" size="3" id="hit_3" class="hit" >
     <input type="text" size="3" id="hit_4" class="hit" >
     <input type="text" size="3" id="hit_5" class="hit" >
-    <br>
+    </div>
+    </div>
 
-    <font size=-1>おしい！</font>
+    <div class="row">
+    <font size=-1 class="row-label">おしい！</font>
+    <div class="row-items">
     <input type="text" size="3" id="blow_1" class="blow" >
     <input type="text" size="3" id="blow_2" class="blow" >
     <input type="text" size="3" id="blow_3" class="blow" >
     <input type="text" size="3" id="blow_4" class="blow" >
     <input type="text" size="3" id="blow_5" class="blow" >
-    <br>
+    </div>
+    </div>
 
-    <font size=-1>はずれ　</font>
-    <input type="text" size="36" id="none" class="none" >
-    <br>
+    <div class="row">
+    <font size=-1 class="row-label">はずれ　</font>
+    <div class="row-items">
+    <input type="text" id="none" class="none" >
+    </div>
+    </div>
     <br>
 
     <div id="grep_condition"></div>
